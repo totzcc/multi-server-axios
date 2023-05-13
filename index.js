@@ -5,6 +5,7 @@ class MultiServerAxios {
     constructor({
                     hosts = [],
                     best_server_test = '/hosts',
+                    best_server_strict = false,
                     best_server_timeout = 3000,
                     best_server_interval = 60000,
                     project_key = '',
@@ -16,7 +17,7 @@ class MultiServerAxios {
         this.config = {
             hosts, sign_key,
             project_key, session_key: `${project_key}_session`,
-            best_server_test, best_server_interval, best_server_timeout,
+            best_server_test, best_server_interval, best_server_timeout, best_server_strict,
             best_server: {host: hosts[0], speed: -1, ok: true}, best_server_time: 0
         }
         this.timeConfig = {
@@ -98,6 +99,7 @@ class MultiServerAxios {
             }
         }
     }
+
     getBestServer(model = 0) {
         return new Promise(resolve => {
             if (this.bestServerLock) {
@@ -129,16 +131,22 @@ class MultiServerAxios {
                                 clearTimeout(timeoutForBest)
                                 if (isReturned) return
                                 isReturned = true
+                                const speed = Date.now() - start
+                                const speedResult = {host, speed, ok, exception}
                                 if (response && response.headers.get('content-type').toLowerCase().indexOf('json') !== -1) {
                                     if (response.data && response.data.data && response.data.data.hosts) {
                                         if (typeof localStorage !== "undefined") {
                                             localStorage.setItem(`${this.config.project_key}_hosts`, JSON.stringify(this.config.hosts))
                                         }
+                                    } else {
+                                        if (this.config.best_server_strict) {
+                                            speedResult.ok = false
+                                            speedResult.exception = 'strict'
+                                        }
                                     }
                                 }
-                                const speed = Date.now() - start
-                                console.log({host, speed, ok, exception})
-                                bestResolve({host, speed, ok, exception})
+                                bestResolve(speedResult)
+                                console.log(speedResult)
                             }
                             axios.get(url)
                                 .then(response => setRetValue(host, response))

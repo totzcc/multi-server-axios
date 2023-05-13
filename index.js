@@ -19,27 +19,21 @@ class MultiServerAxios {
             best_server_test, best_server_interval, best_server_timeout,
             best_server: {host: hosts[0], speed: -1, ok: true}, best_server_time: 0
         }
-        if (typeof localStorage !== "undefined") {
-            let cachedHosts = localStorage.getItem(`${this.config.project_key}_hosts`)
-            if (cachedHosts && cachedHosts[0] === '[') {
-                cachedHosts = JSON.parse(cachedHosts)
-                this.config.hosts = [...new Set([...hosts, ...cachedHosts])]
-            }
-        }
         this.timeConfig = {
             d: 0, t: 0
         }
         this.http = axios.create({
             baseURL: hosts[0], withCredentials: true
         })
-        this.http.interceptors.request.use(config => {
+        this.http.interceptors.request.use(async (config) => {
+            config.baseURL = (await this.getBestServer()).host
             if (this.config.session_key && typeof localStorage !== "undefined") {
                 const authorization = localStorage.getItem(this.config.session_key)
                 if (authorization) {
                     config.headers.setAuthorization(authorization)
                 }
             }
-            return this.addURLSignConfig(config)
+            return await this.addURLSignConfig(config)
         })
 
         this.http.interceptors.response.use(response => {
@@ -95,36 +89,61 @@ class MultiServerAxios {
         return config
     }
 
-    getBestServer(focus = false) {
+    getAllHosts() {
+        if (typeof localStorage !== "undefined") {
+            let cachedHosts = localStorage.getItem(`${this.config.project_key}_hosts`)
+            if (cachedHosts && cachedHosts[0] === '[') {
+                cachedHosts = JSON.parse(cachedHosts)
+                this.config.hosts = [...new Set([...this.config.hosts, ...cachedHosts])]
+            }
+        }
+    }
+    getBestServer(model = 0) {
         return new Promise(resolve => {
-            if (this.config.hosts.length === 1) {
-                resolve(this.config.best_server)
+            if (this.bestServerLock) {
+                setTimeout(() => {
+                    this.getBestServer(model).then(resolve)
+                }, 1000)
             } else {
-                if (focus || (Date.now() - this.config.best_server_time) > this.config.best_server_interval) {
+                this.bestServerLock = true
+                this._getBestServerCore(model).then(resolve).finally(() => this.bestServerLock = false)
+            }
+        })
+    }
+
+    _getBestServerCore(model = 0) {
+        this.getAllHosts()
+        return new Promise(resolve => {
+            if (model === 0 && this.config.hosts.length === 1) {
+                resolve(this.config.best_server)
+                this.getBestServer(2).catch(_ => _)
+            } else {
+                if (model === 1 || (Date.now() - this.config.best_server_time) > this.config.best_server_interval) {
                     const bestChoosers = this.config.hosts.map(host => {
                         const start = Date.now()
                         return new Promise(bestResolve => {
                             const url = `${host}${this.config.best_server_test}`
+                            const timeoutForBest = setTimeout(() => setRetValue(host, undefined, false), this.config.best_server_timeout)
                             let isReturned = false
-                            const setRetValue = (host, response, ok = true) => {
+                            const setRetValue = (host, response, ok = true, exception) => {
+                                clearTimeout(timeoutForBest)
                                 if (isReturned) return
                                 isReturned = true
-                                if (response && response.data[0] === '{' && response.headers.get('content-type').toLowerCase().indexOf('json') !== -1) {
-                                    const remoteHostsConfig = JSON.parse(response.data)
-                                    if (remoteHostsConfig.data.hosts) {
-                                        this.config.hosts = remoteHostsConfig.data.hosts
+                                if (response && response.headers.get('content-type').toLowerCase().indexOf('json') !== -1) {
+                                    if (response.data && response.data.data && response.data.data.hosts) {
                                         if (typeof localStorage !== "undefined") {
                                             localStorage.setItem(`${this.config.project_key}_hosts`, JSON.stringify(this.config.hosts))
                                         }
                                     }
                                 }
                                 const speed = Date.now() - start
-                                bestResolve({host, speed, ok})
+                                console.log({host, speed, ok, exception})
+                                bestResolve({host, speed, ok, exception})
                             }
-                            axios.get(url).then(response => setRetValue(host, response)).catch(_ => _)
-                            setTimeout(() => {
-                                setRetValue(host, undefined, false)
-                            }, this.config.best_server_timeout)
+                            axios.get(url)
+                                .then(response => setRetValue(host, response))
+                                .catch(exception => setRetValue(host, undefined, false, exception))
+
                         })
                     })
                     Promise.all(bestChoosers).then(speedResults => {

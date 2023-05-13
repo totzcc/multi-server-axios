@@ -4,8 +4,7 @@ const md5 = require('md5')
 class MultiServerAxios {
     constructor({
                     hosts = [],
-                    best_server_test = '/hosts',
-                    best_server_strict = false,
+                    best_server_test = '/hosts.json',
                     best_server_timeout = 3000,
                     best_server_interval = 60000,
                     project_key = '',
@@ -17,8 +16,8 @@ class MultiServerAxios {
         this.config = {
             hosts, sign_key,
             project_key, session_key: `${project_key}_session`,
-            best_server_test, best_server_interval, best_server_timeout, best_server_strict,
-            best_server: {host: hosts[0], speed: -1, ok: true}, best_server_time: 0
+            best_server_test, best_server_interval, best_server_timeout,
+            best_server: {host: hosts[0], speed: -1, ok: false}, best_server_time: 0
         }
         this.timeConfig = {
             d: 0, t: 0
@@ -113,9 +112,13 @@ class MultiServerAxios {
         })
     }
 
+    // model 0 获取缓存， 1 立即刷新
     _getBestServerCore(model = 0) {
         this.getAllHosts()
         return new Promise(resolve => {
+            if (this.config.best_server.host.startsWith('config+')) {
+                model = 1
+            }
             if (model === 0 && this.config.hosts.length === 1) {
                 resolve(this.config.best_server)
                 this.getBestServer(2).catch(_ => _)
@@ -124,7 +127,7 @@ class MultiServerAxios {
                     const bestChoosers = this.config.hosts.map(host => {
                         const start = Date.now()
                         return new Promise(bestResolve => {
-                            const url = `${host}${this.config.best_server_test}`
+                            const url = `${host.replace('config+', '')}${this.config.best_server_test}`
                             const timeoutForBest = setTimeout(() => setRetValue(host, undefined, false), this.config.best_server_timeout)
                             let isReturned = false
                             const setRetValue = (host, response, ok = true, exception) => {
@@ -136,13 +139,10 @@ class MultiServerAxios {
                                 if (response && response.headers.get('content-type').toLowerCase().indexOf('json') !== -1) {
                                     if (response.data && response.data.data && response.data.data.hosts) {
                                         if (typeof localStorage !== "undefined") {
-                                            localStorage.setItem(`${this.config.project_key}_hosts`, JSON.stringify(this.config.hosts))
+                                            localStorage.setItem(`${this.config.project_key}_hosts`, JSON.stringify(response.data.data.hosts))
                                         }
                                     } else {
-                                        if (this.config.best_server_strict) {
-                                            speedResult.ok = false
-                                            speedResult.exception = 'strict'
-                                        }
+                                        speedResult.ok = false
                                     }
                                 }
                                 bestResolve(speedResult)
@@ -164,12 +164,14 @@ class MultiServerAxios {
                                 return 0
                             }
                         })
-                        const bestServer = speedResults.filter(v => v.ok)[0]
+                        const bestServer = speedResults.filter(v => v.ok && !v.host.startsWith('config+'))[0]
                         if (bestServer) {
                             this.config.best_server = {...bestServer, results: speedResults}
                             this.config.best_server_time = Date.now()
+                            resolve(this.config.best_server)
+                        } else {
+                            this._getBestServerCore(1).then(resolve)
                         }
-                        resolve(this.config.best_server)
                     })
                 } else {
                     resolve(this.config.best_server)

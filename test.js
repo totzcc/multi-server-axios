@@ -10,7 +10,8 @@ const multiServerAxios = new MultiServerAxios({
     best_server_test: '/',
     best_server_interval: 2000,
     best_server_timeout: 1000,
-    cdn_key: 'abcd'
+    cdn_key: 'abc',
+    project_key: 'test'
 })
 
 function a1() {

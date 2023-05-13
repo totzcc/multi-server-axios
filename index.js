@@ -3,18 +3,28 @@ const md5 = require('md5')
 
 class MultiServerAxios {
     constructor({
-                    dev_host = 'http://localhost',
                     hosts = [],
                     best_server_test = '/hosts',
                     best_server_timeout = 3000,
                     best_server_interval = 60000,
-                    session_key = '',
+                    project_key = '',
                     sign_key = '',
                 } = {}) {
+        if (!project_key) {
+            throw new Error('project_key must have!!')
+        }
         this.config = {
-            dev_host, hosts, session_key, sign_key,
+            hosts, sign_key,
+            project_key, session_key: `${project_key}_session`,
             best_server_test, best_server_interval, best_server_timeout,
             best_server: {host: hosts[0], speed: -1, ok: true}, best_server_time: 0
+        }
+        if (typeof localStorage !== "undefined") {
+            let cachedHosts = localStorage.getItem(`${this.config.project_key}_hosts`)
+            if (cachedHosts && cachedHosts[0] === '[') {
+                cachedHosts = JSON.parse(cachedHosts)
+                this.config.hosts = [...new Set([...hosts, ...cachedHosts])]
+            }
         }
         this.timeConfig = {
             d: 0, t: 0
@@ -103,6 +113,9 @@ class MultiServerAxios {
                                     const remoteHostsConfig = JSON.parse(response.data)
                                     if (remoteHostsConfig.data.hosts) {
                                         this.config.hosts = remoteHostsConfig.data.hosts
+                                        if (typeof localStorage !== "undefined") {
+                                            localStorage.setItem(`${this.config.project_key}_hosts`, JSON.stringify(this.config.hosts))
+                                        }
                                     }
                                 }
                                 const speed = Date.now() - start

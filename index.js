@@ -197,7 +197,11 @@ class MultiServerAxios {
                         this.timeConfig = window['QZOutputJson']
                         this.getTimeConfig().then(resolve)
                     } else {
-                        document.write(`<script src="${timeURL}"></script>`);
+                        const oHead = document.getElementsByTagName("HEAD").item(0);
+                        const oScript= document.createElement("script");
+                        oScript.type = "text/javascript";
+                        oScript.src=`https://vv.video.qq.com/checktime?otype=json&ts=${Date.now()}`;
+                        oHead.appendChild( oScript);
                         setTimeout(() => {
                             this.getTimeConfig().then(resolve)
                         }, 500)

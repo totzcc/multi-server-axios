@@ -170,7 +170,9 @@ class MultiServerAxios {
                             this.config.best_server_time = Date.now()
                             resolve(this.config.best_server)
                         } else {
-                            this._getBestServerCore(1).then(resolve)
+                            setTimeout(() => {
+                                this._getBestServerCore(1).then(resolve)
+                            }, 500)
                         }
                     })
                 } else {

@@ -1,4 +1,4 @@
-const axios = require('axios')
+const axios = require('axios').default
 const md5 = require('md5')
 
 class MultiServerAxios {

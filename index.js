@@ -4,7 +4,7 @@ const md5 = require('md5')
 class MultiServerAxios {
     constructor({
                     hosts = [],
-                    best_server_test = '/hosts.json',
+                    best_server_test = '',
                     best_server_timeout = 3000,
                     best_server_interval = 60000,
                     project_key = '',
@@ -114,8 +114,14 @@ class MultiServerAxios {
 
     // model 0 获取缓存， 1 立即刷新
     _getBestServerCore(model = 0) {
-        this.getAllHosts()
+        if (this.config.best_server_test) {
+            this.getAllHosts()
+        }
         return new Promise(resolve => {
+            if (!this.config.best_server_test) {
+                resolve(this.config.hosts[0])
+                return
+            }
             if (this.config.best_server.host.startsWith('config+')) {
                 model = 1
             }

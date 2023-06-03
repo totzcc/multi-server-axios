@@ -110,7 +110,10 @@ class MultiServerAxios {
                 }, 1000)
             } else {
                 this.bestServerLock = true
-                this._getBestServerCore(model).then(resolve).finally(() => this.bestServerLock = false)
+                this._getBestServerCore(model).then((ret) => {
+                    this.bestServerLock = false
+                    resolve(ret)
+                })
             }
         })
     }
@@ -128,6 +131,7 @@ class MultiServerAxios {
                     ok: true
                 }
                 resolve(this.config.best_server)
+                return
             }
             if (this.config.best_server.host.startsWith('config+')) {
                 model = 1

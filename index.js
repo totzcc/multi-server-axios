@@ -73,7 +73,10 @@ class MultiServerAxios {
 
     async addURLSignConfig(config, key = this.config.sign_key) {
         if (key) {
-            const {baseURL, url, params = {}} = config
+            let {baseURL, url, params = {}} = config
+            if (!baseURL || !baseURL.startsWith('http')) {
+                baseURL = location.origin
+            }
             if (url.startsWith('/')) {
                 if (!this.timeConfig.d) {
                     await this.getTimeConfig()
@@ -119,8 +122,12 @@ class MultiServerAxios {
         }
         return new Promise(resolve => {
             if (!this.config.best_server_test) {
-                resolve(this.config.hosts[0])
-                return
+                this.config.best_server = {
+                    host: this.config.hosts[0],
+                    speed: 100,
+                    ok: true
+                }
+                resolve(this.config.best_server)
             }
             if (this.config.best_server.host.startsWith('config+')) {
                 model = 1

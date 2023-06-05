@@ -97,7 +97,10 @@ class MultiServerAxios {
             let cachedHosts = localStorage.getItem(`${this.config.project_key}_hosts`)
             if (cachedHosts && cachedHosts[0] === '[') {
                 cachedHosts = JSON.parse(cachedHosts)
-                this.config.hosts = [...new Set([...this.config.hosts, ...cachedHosts])]
+                const hostSet = new Set()
+                this.config.hosts.forEach(v => hostSet.add(v))
+                cachedHosts.forEach(v => hostSet.add(v))
+                this.config.hosts = Array.from(hostSet)
             }
         }
     }
@@ -183,7 +186,8 @@ class MultiServerAxios {
                         })
                         const bestServer = speedResults.filter(v => v.ok && !v.host.startsWith('config+'))[0]
                         if (bestServer) {
-                            this.config.best_server = {...bestServer, results: speedResults}
+                            bestServer.result = speedResults
+                            this.config.best_server = bestServer.result
                             this.config.best_server_time = Date.now()
                             resolve(this.config.best_server)
                         } else {

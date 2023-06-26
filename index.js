@@ -187,7 +187,7 @@ class MultiServerAxios {
                         const bestServer = speedResults.filter(v => v.ok && !v.host.startsWith('config+'))[0]
                         if (bestServer) {
                             bestServer.result = speedResults
-                            this.config.best_server = bestServer.result
+                            this.config.best_server = bestServer
                             this.config.best_server_time = Date.now()
                             resolve(this.config.best_server)
                         } else {
